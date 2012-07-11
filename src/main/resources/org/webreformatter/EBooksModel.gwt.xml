@@ -1,0 +1,6 @@
+<module>
+    <source path="ebook">
+        <exclude name="**/server/**" />
+        <exclude name="**/epub/**" />
+    </source>
+</module>
