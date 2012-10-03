@@ -32,7 +32,11 @@ public class JsonBookToc extends JsonBookBase implements IBookToc {
         }
 
         public Uri getContentHref() {
-            return getValue("href", JsonBookBase.URI_FACTORY);
+            Uri uri = getValue("href", JsonBookBase.URI_FACTORY);
+            if (uri == null) {
+                uri = new Uri("");
+            }
+            return uri;
         }
 
         public String getLabel() {

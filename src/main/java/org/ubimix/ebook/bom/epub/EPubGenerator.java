@@ -82,6 +82,7 @@ public class EPubGenerator implements IBookListener {
 
             EPubContainer container = EPubContainer
                 .newEPubContainer(fXmlContext);
+            container.setAttribute("version", "1.0");
             container.setContentDeclarationPath(EPUB_BOOK_FILE);
             writeEntry(EPubContainer.META_INF_CONTAINER_PATH, container);
 

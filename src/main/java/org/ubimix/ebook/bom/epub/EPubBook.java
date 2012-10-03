@@ -249,6 +249,7 @@ public class EPubBook extends EPubXml implements IBook {
 
     public static EPubBook newBook(XmlContext xmlContext) throws XmlException {
         EPubBook book = xmlContext.newXML("opf:package", EPubBook.class);
+        book.setAttribute("version", "3.0");
         return book;
     }
 
