@@ -2,6 +2,7 @@ package org.ubimix.ebook.bom;
 
 import java.util.List;
 
+import org.ubimix.commons.json.ext.FormattedDate;
 import org.ubimix.ebook.BookId;
 
 /**
@@ -38,6 +39,8 @@ public interface IBook {
          * @return an e-book title
          */
         String getBookTitle();
+
+        FormattedDate getModifiedDate();
 
     }
 

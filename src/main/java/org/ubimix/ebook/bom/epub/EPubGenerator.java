@@ -14,6 +14,7 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import org.ubimix.commons.json.ext.FormattedDate;
 import org.ubimix.commons.uri.Uri;
 import org.ubimix.commons.xml.XmlException;
 import org.ubimix.commons.xml.XmlWrapper;
@@ -44,6 +45,12 @@ public class EPubGenerator implements IBookListener {
 
     private final static BookId EPUB_TOC_ID = new BookId("ncx");
 
+    // http://idpf.org/epub/30/spec/epub30-publications.html#attrdef-package-unique-identifier
+    // http://idpf.org/epub/linking/cfi/epub-cfi.html
+    // http://en.wikipedia.org/wiki/EPUB
+
+    final static String EPUB_UNIQUE_IDENTIFIER_IDREF = "bookid";
+
     private final static Logger log = Logger.getLogger(EPubGenerator.class
         .getName());
 
@@ -51,7 +58,7 @@ public class EPubGenerator implements IBookListener {
 
     private ZipOutputStream fOutput;
 
-    private File fOutputFile;
+    private final File fOutputFile;
 
     private XmlContext fXmlContext;
 
@@ -108,7 +115,7 @@ public class EPubGenerator implements IBookListener {
         final EPubManifest manifest = fBook.getManifest(true);
         return new IBookManifestListener() {
 
-            private List<BookId> fList = new ArrayList<BookId>();
+            private final List<BookId> fList = new ArrayList<BookId>();
 
             public void beginBookManifest() {
                 try {
@@ -147,6 +154,7 @@ public class EPubGenerator implements IBookListener {
                     entry.setMethod(ZipEntry.DEFLATED);
                     fOutput.putNextEntry(entry);
                     return new IOutput() {
+
                         public void close() throws IOException {
                             fOutput.closeEntry();
                         }
@@ -190,6 +198,9 @@ public class EPubGenerator implements IBookListener {
                     metadata.setBookTitle(bookTitle);
                     metadata.setBookCreator(bookCreator);
                     metadata.setBookLanguage(bookLanguage);
+                    // TODO: add modified date to the list of parameters
+                    metadata.setModifiedDate(new FormattedDate(
+                        "2011-01-01T12:00:00Z"));
                 } catch (Throwable t) {
                     throw onError("Can not set book metadata", t);
                 }
@@ -213,7 +224,7 @@ public class EPubGenerator implements IBookListener {
             final EPubToc toc = EPubToc.newToc(fXmlContext);
             return new IBookTocListener() {
 
-                private Stack<EPubTocItem> fStack = new Stack<EPubToc.EPubTocItem>();
+                private final Stack<EPubTocItem> fStack = new Stack<EPubToc.EPubTocItem>();
 
                 public void beginToc() {
                 }

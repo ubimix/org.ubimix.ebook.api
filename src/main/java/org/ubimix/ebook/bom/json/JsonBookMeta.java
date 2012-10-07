@@ -1,5 +1,6 @@
 package org.ubimix.ebook.bom.json;
 
+import org.ubimix.commons.json.ext.FormattedDate;
 import org.ubimix.ebook.BookId;
 import org.ubimix.ebook.bom.IBook.IBookMetadata;
 
@@ -28,6 +29,11 @@ public class JsonBookMeta extends JsonBookBase implements IBookMetadata {
 
     public String getBookTitle() {
         return getString("dc:title");
+    }
+
+    public FormattedDate getModifiedDate() {
+        // TODO Auto-generated method stub
+        return null;
     }
 
     public JsonBookMeta setBookCreator(String value) {

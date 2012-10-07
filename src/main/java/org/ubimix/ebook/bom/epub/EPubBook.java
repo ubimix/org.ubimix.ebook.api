@@ -5,6 +5,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.w3c.dom.Node;
+
+import org.ubimix.commons.json.ext.FormattedDate;
 import org.ubimix.commons.uri.Uri;
 import org.ubimix.commons.xml.XmlException;
 import org.ubimix.commons.xml.XmlWrapper;
@@ -145,6 +147,15 @@ public class EPubBook extends EPubXml implements IBook {
             return getString("dc:title");
         }
 
+        public FormattedDate getModifiedDate() {
+            // TODO: getElement "meta" with attribute
+            // property='dcterms:modified'
+            // getAttribute(attrName)
+            String modifiedDateValue = getString("opf:meta");
+            FormattedDate date = new FormattedDate(modifiedDateValue);
+            return date;
+        }
+
         public EPubMetadata setBookCreator(String creator) throws XmlException {
             setTextElement("dc:creator", creator);
             return cast();
@@ -158,6 +169,9 @@ public class EPubBook extends EPubXml implements IBook {
             XmlWrapper identifierTag = getOrCreateElement("dc:identifier");
             identifierTag.removeChildren();
             identifierTag.appendText(id);
+            identifierTag.setAttribute(
+                "id",
+                EPubGenerator.EPUB_UNIQUE_IDENTIFIER_IDREF);
             return cast();
         }
 
@@ -168,6 +182,15 @@ public class EPubBook extends EPubXml implements IBook {
 
         public EPubMetadata setBookTitle(String title) throws XmlException {
             setTextElement("dc:title", title);
+            return cast();
+        }
+
+        public EPubMetadata setModifiedDate(FormattedDate modifiedDate)
+            throws XmlException {
+            XmlWrapper wrapper = setTextElement(
+                "opf:meta",
+                modifiedDate.getDate());
+            wrapper.setAttribute("property", "dcterms:modified");
             return cast();
         }
 
@@ -250,6 +273,9 @@ public class EPubBook extends EPubXml implements IBook {
     public static EPubBook newBook(XmlContext xmlContext) throws XmlException {
         EPubBook book = xmlContext.newXML("opf:package", EPubBook.class);
         book.setAttribute("version", "3.0");
+        book.setAttribute(
+            "unique-identifier",
+            EPubGenerator.EPUB_UNIQUE_IDENTIFIER_IDREF);
         return book;
     }
 
