@@ -71,7 +71,7 @@ public class BookVisitor implements IBookVisitor {
             String label = item.getLabel();
             tocListener.beginTocItem(path, label);
             try {
-                visitTocItems(tocListener, item.getChildren());
+                visitTocItems(tocListener, item.getTocItems());
             } finally {
                 tocListener.endTocItem();
             }
@@ -84,6 +84,7 @@ public class BookVisitor implements IBookVisitor {
         fReader = reader;
     }
 
+    @Override
     public void visitBook(IBookListener listener) throws IOException {
         listener.begin();
         try {

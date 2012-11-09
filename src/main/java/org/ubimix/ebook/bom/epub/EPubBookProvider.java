@@ -11,10 +11,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.ubimix.commons.digests.Sha1Digest;
 import org.ubimix.commons.uri.Uri;
 import org.ubimix.ebook.bom.IBook;
 import org.ubimix.ebook.bom.IBookProvider;
@@ -29,7 +29,31 @@ import org.ubimix.ebook.io.server.UnzipUtil.IProgressListener;
 /**
  * @author kotelnikov
  */
-public class EPubBookProvider implements IBookProvider {
+public class EPubBookProvider extends EPubIO implements IBookProvider {
+
+    protected static void appendByteToBuf(StringBuilder buf, int val) {
+        String str = Integer.toHexString(val & 0xFF);
+        if (str.length() < 2) {
+            buf.append('0');
+        }
+        buf.append(str);
+    }
+
+    public static String getDigest(String string) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            digest.update(string.getBytes("UTF-8"));
+            byte[] digestResult = digest.digest();
+            StringBuilder buf = new StringBuilder();
+            for (int i = 0; i < digestResult.length; i++) {
+                appendByteToBuf(buf, digestResult[i]);
+            }
+            String result = buf.toString();
+            return result;
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
 
     private File fBookDir;
 
@@ -68,12 +92,13 @@ public class EPubBookProvider implements IBookProvider {
             EPubBook book = r != null ? r.getBook() : null;
             return book;
         } catch (Throwable t) {
-            throw EPubXml.onError("Can not load a book. Book reference: '"
+            throw onError("Can not load a book. Book reference: '"
                 + bookHref
                 + "'.", t);
         }
     }
 
+    @Override
     public EpubReader getBookReader(Uri bookUrl) throws IOException {
         EpubReader reader = fReaders.get(bookUrl);
         if (reader == null) {
@@ -112,14 +137,17 @@ public class EPubBookProvider implements IBookProvider {
                     StreamToInput in = new StreamToInput(input);
                     UnzipUtil.unzip(in, bookStore, new IProgressListener() {
 
+                        @Override
                         public void begin() {
                             System.out.println("Start unzipping...");
                         }
 
+                        @Override
                         public void end() {
                             System.out.println("Unzipped.");
                         }
 
+                        @Override
                         public boolean onUpdate(
                             String name,
                             long size,
@@ -149,7 +177,7 @@ public class EPubBookProvider implements IBookProvider {
             }
             return r.getBookResource(resourceRef);
         } catch (Throwable t) {
-            throw EPubXml.onError("Can not load TOC of a book. "
+            throw onError("Can not load TOC of a book. "
                 + "Book reference: '"
                 + bookHref
                 + "'.", t);
@@ -167,7 +195,7 @@ public class EPubBookProvider implements IBookProvider {
             }
             return bookSection;
         } catch (Throwable t) {
-            throw EPubXml.onError("Can not load a book section. "
+            throw onError("Can not load a book section. "
                 + "Book reference: '"
                 + bookHref
                 + "'. "
@@ -183,7 +211,7 @@ public class EPubBookProvider implements IBookProvider {
             EPubToc bookToc = r != null ? r.getBookToc() : null;
             return bookToc;
         } catch (Throwable t) {
-            throw EPubXml.onError("Can not load TOC of a book. "
+            throw onError("Can not load TOC of a book. "
                 + "Book reference: '"
                 + bookHref
                 + "'.", t);
@@ -191,11 +219,8 @@ public class EPubBookProvider implements IBookProvider {
     }
 
     private File getTargetDir(Uri bookUrl) {
-        Sha1Digest digest = Sha1Digest
-            .builder()
-            .update(bookUrl.toString())
-            .build();
-        File dir = new File(fWorkDir, digest.toString());
+        String str = getDigest(bookUrl.toString());
+        File dir = new File(fWorkDir, str);
         return dir;
     }
 }

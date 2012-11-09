@@ -3,24 +3,14 @@
  */
 package org.ubimix.ebook.bom.epub;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.net.URL;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
-import javax.xml.parsers.DocumentBuilder;
-
-import org.w3c.dom.Document;
-import org.ubimix.commons.digests.Sha1Digest;
+import org.ubimix.commons.parser.UnboundedCharStream;
+import org.ubimix.commons.parser.UnboundedCharStream.ICharLoader;
+import org.ubimix.commons.parser.stream.StreamCharLoader;
 import org.ubimix.commons.uri.Uri;
-import org.ubimix.commons.xml.XmlException;
-import org.ubimix.commons.xml.XmlWrapper;
-import org.ubimix.commons.xml.XmlWrapper.XmlContext;
 import org.ubimix.ebook.BookId;
 import org.ubimix.ebook.bom.IBookProvider.IBookReader;
 import org.ubimix.ebook.bom.epub.EPubBook.EPubManifest;
@@ -28,164 +18,19 @@ import org.ubimix.ebook.bom.epub.EPubBook.EPubManifest.EPubManifestItem;
 import org.ubimix.ebook.bom.epub.EPubBook.EPubSpine;
 import org.ubimix.ebook.io.IInput;
 import org.ubimix.ebook.io.IStore;
-import org.ubimix.ebook.io.InOutUtil;
 import org.ubimix.ebook.io.server.InputToStream;
-import org.ubimix.ebook.io.server.StreamToInput;
-import org.ubimix.ebook.io.server.StreamToOutput;
 import org.ubimix.ebook.io.server.UnzipUtil;
 import org.ubimix.ebook.io.server.UnzipUtil.IProgressListener;
-import org.xml.sax.EntityResolver;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
+import org.ubimix.model.xml.XmlElement;
 
 /**
  * @author kotelnikov
  */
-public class EpubReader implements IBookReader {
-
-    private static class CachingEntityResolver implements EntityResolver {
-
-        private Map<String, byte[]> fCache = new LinkedHashMap<String, byte[]>() {
-            private static final long serialVersionUID = -4705808307813538924L;
-
-            private long fFullSize = 0;
-
-            @Override
-            public void clear() {
-                super.clear();
-                fFullSize = 0;
-            }
-
-            private void decFullSize(byte[] buf) {
-                fFullSize -= buf != null ? buf.length : 0;
-            }
-
-            private void incFullSize(byte[] buf) {
-                fFullSize += buf != null ? buf.length : 0;
-            }
-
-            @Override
-            public byte[] put(String key, byte[] value) {
-                incFullSize(value);
-                byte[] removed = super.put(key, value);
-                decFullSize(removed);
-                return removed;
-            }
-
-            @Override
-            public boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
-                byte[] buf = eldest.getValue();
-                boolean remove = fFullSize > getMaxCacheSize();
-                if (remove) {
-                    decFullSize(buf);
-                }
-                return remove;
-            }
-
-        };
-
-        private IStore fEntityStore;
-
-        private Uri fPrevUri;
-
-        public CachingEntityResolver(IStore entityStore) {
-            fEntityStore = entityStore;
-        }
-
-        private String getBase64Name(Uri systemId) throws IOException {
-            Sha1Digest digest = Sha1Digest
-                .builder()
-                .update(systemId.toString())
-                .build();
-            String str = digest.toString();
-            return str + ".txt";
-        }
-
-        private IInput getFromCache(String publicId) {
-            byte[] buf = fCache.get(publicId);
-            if (buf == null) {
-                return null;
-            }
-            return new StreamToInput(new ByteArrayInputStream(buf));
-        }
-
-        private IInput getFromStore(String publicId, String systemId)
-            throws IOException {
-
-            Uri url = new Uri(systemId);
-            boolean local = "file".equals(url.getScheme());
-            if (local) {
-                String fileName = url.getPath().getFileName();
-                url = fPrevUri.getResolved(fileName);
-            }
-            String cacheId = getBase64Name(url);
-            IInput input = fEntityStore.getInput(cacheId);
-            if (input == null) {
-                input = getRemoteStream(url);
-                if (input != null) {
-                    try {
-                        fEntityStore.getOutput(cacheId);
-                    } finally {
-                        input.close();
-                    }
-                    input = fEntityStore.getInput(cacheId);
-                }
-            }
-            if (input != null) {
-                fPrevUri = url;
-            }
-            return input;
-        }
-
-        protected long getMaxCacheSize() {
-            return 1024 * 1024 * 3;
-        }
-
-        private IInput getRemoteStream(Uri uri) throws IOException {
-            URL u = new URL(uri.toString());
-            try {
-                IInput stream = new StreamToInput(u.openStream());
-                return stream;
-            } catch (FileNotFoundException e) {
-                return null;
-            }
-        }
-
-        private void putToCache(String publicId, IInput input)
-            throws IOException {
-            try {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                StreamToOutput o = new StreamToOutput(out);
-                InOutUtil.copy(input, o);
-                byte[] buf = out.toByteArray();
-                fCache.put(publicId, buf);
-            } finally {
-                input.close();
-            }
-        }
-
-        public InputSource resolveEntity(String publicId, String systemId)
-            throws SAXException,
-            IOException {
-            IInput input = getFromCache(publicId);
-            if (input == null) {
-                input = getFromStore(publicId, systemId);
-                putToCache(publicId, input);
-                input = getFromCache(publicId);
-            }
-            final IInput i = input;
-            InputSource source = new InputSource(new InputToStream(i));
-            return source;
-        }
-    }
-
-    private DocumentBuilder fBuilder;
+public class EpubReader extends EPubIO implements IBookReader {
 
     private EPubContainer fContainer;
 
     private Uri fContentDeclarationPath;
-
-    private EntityResolver fEntityResolver;
 
     private EPubBook fEPubBook;
 
@@ -195,34 +40,23 @@ public class EpubReader implements IBookReader {
 
     private Uri fTocPath;
 
-    private XmlContext fXmlContext;
-
     public EpubReader(IStore bookStore, IStore xmlEntityStore) {
-        fXmlContext = EPubXml.newXmlContext();
         fStore = bookStore;
-        fEntityResolver = new CachingEntityResolver(xmlEntityStore);
-        try {
-            fBuilder = XmlWrapper.getDocumentBuilder();
-        } catch (XmlException t) {
-            throw EPubXml.onError("Can not create a document builder.", t);
-        }
-        fBuilder.setEntityResolver(fEntityResolver);
     }
 
+    @Override
     public EPubBook getBook() {
         if (fEPubBook == null) {
-            try {
-                EPubContainer container = getEPubContainer();
-                fContentDeclarationPath = container.getContentDeclarationPath();
-                fEPubBook = getXml(fContentDeclarationPath, EPubBook.class);
-                fEPubBook.updatePaths(fContentDeclarationPath);
-            } catch (Throwable t) {
-                throw EPubXml.onError("Can not read an EPub book.", t);
-            }
+            EPubContainer container = getEPubContainer();
+            fContentDeclarationPath = container.getContentDeclarationPath();
+            XmlElement e = getXml(fContentDeclarationPath);
+            fEPubBook = new EPubBook(e);
+            fEPubBook.updatePaths(fContentDeclarationPath);
         }
         return fEPubBook;
     }
 
+    @Override
     public IInput getBookResource(Uri resourceRef) throws IOException {
         final IInput in = fStore.getInput(resourceRef.toString());
         if (in == null) {
@@ -230,10 +64,12 @@ public class EpubReader implements IBookReader {
         }
         return new IInput() {
 
+            @Override
             public void close() throws IOException {
                 in.close();
             }
 
+            @Override
             public int read(byte[] buf, int offset, int len) throws IOException {
                 return in.read(buf, offset, len);
             }
@@ -241,11 +77,14 @@ public class EpubReader implements IBookReader {
         };
     }
 
+    @Override
     public EPubSection getBookSection(Uri sectionRef) {
-        EPubSection section = getXml(sectionRef, EPubSection.class);
+        XmlElement e = getXml(sectionRef);
+        EPubSection section = new EPubSection(e);
         return section;
     }
 
+    @Override
     public EPubToc getBookToc() {
         if (fEPubToc == null) {
             EPubBook book = getBook();
@@ -254,7 +93,8 @@ public class EpubReader implements IBookReader {
             BookId tocId = spine.getTocId();
             EPubManifestItem tocManifestItem = manifest.getItemById(tocId);
             fTocPath = tocManifestItem.getHref();
-            fEPubToc = getXml(fTocPath, EPubToc.class);
+            XmlElement e = getXml(fTocPath);
+            fEPubToc = new EPubToc(e);
             fEPubToc.updatePaths(fTocPath);
         }
         return fEPubToc;
@@ -267,9 +107,8 @@ public class EpubReader implements IBookReader {
 
     protected EPubContainer getEPubContainer() {
         if (fContainer == null) {
-            fContainer = getXml(
-                EPubContainer.META_INF_CONTAINER_PATH,
-                EPubContainer.class);
+            XmlElement e = getXml(EPubContainer.META_INF_CONTAINER_PATH);
+            fContainer = new EPubContainer(e);
         }
         return fContainer;
     }
@@ -279,7 +118,7 @@ public class EpubReader implements IBookReader {
         return fTocPath;
     }
 
-    private <T extends XmlWrapper> T getXml(Uri path, Class<T> type) {
+    private XmlElement getXml(Uri path) {
         try {
             IInput in = fStore.getInput(path.toString());
             if (in == null) {
@@ -288,17 +127,16 @@ public class EpubReader implements IBookReader {
             try {
                 InputToStream input = new InputToStream(in);
                 Reader reader = new InputStreamReader(input);
-                InputSource source = new InputSource(reader);
-                Document doc = fBuilder.parse(source);
-                T wrapper = fXmlContext.wrap(doc, type);
-                return wrapper;
+                ICharLoader loader = new StreamCharLoader(reader);
+                UnboundedCharStream stream = new UnboundedCharStream(loader);
+                XmlElement e = XmlElement.parse(stream);
+                return e;
             } finally {
                 in.close();
             }
+            // FIXME: fix/normalize all namespaces in the imported content
         } catch (Throwable t) {
-            throw EPubXml.onError("Can not read an XML file. Path: '"
-                + path
-                + "'.", t);
+            throw onError("Can not read an XML file. Path: '" + path + "'.", t);
         }
     }
 

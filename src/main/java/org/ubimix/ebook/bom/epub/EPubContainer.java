@@ -1,9 +1,10 @@
 package org.ubimix.ebook.bom.epub;
 
-import org.w3c.dom.Node;
+import java.util.Map;
+
 import org.ubimix.commons.uri.Uri;
-import org.ubimix.commons.xml.XmlException;
-import org.ubimix.commons.xml.XmlWrapper;
+import org.ubimix.model.IHasValueMap;
+import org.ubimix.model.xml.XmlElement;
 
 /**
  * @author kotelnikov
@@ -13,25 +14,31 @@ public class EPubContainer extends EPubXml {
     public static Uri META_INF_CONTAINER_PATH = new Uri(
         "META-INF/container.xml");
 
-    public static EPubContainer newEPubContainer(XmlContext context)
-        throws XmlException {
-        return context.newXML("odc:container", EPubContainer.class);
+    public EPubContainer() {
+        super("odc:container");
     }
 
-    public EPubContainer(Node node, XmlContext context) {
-        super(node, context);
+    public EPubContainer(IHasValueMap object) {
+        super(object);
     }
 
-    public Uri getContentDeclarationPath() throws XmlException {
-        String str = evalStr("/odc:container/odc:rootfiles/odc:rootfile/@full-path");
+    public EPubContainer(XmlElement parent, Map<Object, Object> map) {
+        super(parent, map);
+    }
+
+    public Uri getContentDeclarationPath() {
+        XmlElement e = getChildByPath(
+            "odc:container",
+            "odc:rootfiles",
+            "odc:rootfile");
+        String str = e != null ? e.getAttribute("full-path") : null;
         Uri ref = new Uri(str);
         return ref;
     }
 
-    public EPubContainer setContentDeclarationPath(Uri path)
-        throws XmlException {
-        XmlWrapper rootfiles = getOrCreateElement("odc:rootfiles");
-        XmlWrapper rootfile = rootfiles.getOrCreateElement("odc:rootfile");
+    public EPubContainer setContentDeclarationPath(Uri path) {
+        XmlElement rootfiles = getOrCreateElement("odc:rootfiles");
+        XmlElement rootfile = rootfiles.getOrCreateElement("odc:rootfile");
         rootfile.setAttribute("full-path", path + "");
         rootfile.setAttribute("media-type", "application/oebps-package+xml");
         return cast();

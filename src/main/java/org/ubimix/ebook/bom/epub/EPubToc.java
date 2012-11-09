@@ -2,67 +2,75 @@ package org.ubimix.ebook.bom.epub;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-import org.w3c.dom.Node;
 import org.ubimix.commons.uri.Uri;
-import org.ubimix.commons.xml.XmlException;
-import org.ubimix.commons.xml.XmlWrapper;
 import org.ubimix.ebook.BookId;
 import org.ubimix.ebook.bom.IBookToc;
+import org.ubimix.model.IHasValueMap;
+import org.ubimix.model.xml.XmlElement;
 
 public class EPubToc extends EPubXml implements IBookToc {
 
     public static class EPubTocItem extends EPubXml implements IBookTocItem {
 
-        public static EPubTocItem newTocItem() throws XmlException {
-            XmlContext xmlContext = newXmlContext();
-            return newTocItem(xmlContext);
+        public EPubTocItem() {
+            super("ncx:navPoint");
         }
 
-        public static EPubTocItem newTocItem(XmlContext context)
-            throws XmlException {
-            EPubTocItem item = context
-                .newXML("ncx:navPoint", EPubTocItem.class);
-            return item;
+        public EPubTocItem(IHasValueMap object) {
+            super(object);
         }
 
-        public EPubTocItem(Node node, XmlContext context) {
-            super(node, context);
+        public EPubTocItem(XmlElement parent, IHasValueMap map) {
+            super(parent, map.getMap());
         }
 
         public EPubTocItem addChild() {
-            try {
-                EPubTocItem item = appendElement(
-                    "ncx:navPoint",
-                    EPubTocItem.class);
-                return item;
-            } catch (Throwable t) {
-                throw onError("Can not add a new TOC item", t);
+            EPubTocItem item = new EPubTocItem();
+            addChild(item);
+            return item;
+        }
+
+        @Override
+        public List<IBookTocItem> getTocItems() {
+            List<XmlElement> list = getChildrenByName("ncx:navPoint");
+            List<IBookTocItem> result = new ArrayList<IBookToc.IBookTocItem>();
+            for (XmlElement e : list) {
+                result.add(new EPubTocItem(this, e));
             }
+            return result;
         }
 
-        public List<IBookTocItem> getChildren() {
-            List<EPubTocItem> list = getXmlList(
-                "ncx:navPoint",
-                EPubToc.EPubTocItem.class);
-            return new ArrayList<IBookTocItem>(list);
-        }
-
+        @Override
         public Uri getContentHref() {
-            String str = getString("ncx:content/@src");
+            String str = null;
+            XmlElement e = getChildByName("ncx:content");
+            if (e != null) {
+                str = e.getAttribute("src");
+            }
             return new Uri(str);
         }
 
         public String getId() {
-            return getString("@id");
+            return getAttribute("id");
         }
 
+        @Override
         public String getLabel() {
-            return getString("ncx:navLabel/ncx:text");
+            XmlElement e = getChildByName("ncx:navLabel");
+            String result = null;
+            if (e != null) {
+                e = e.getChildByName("ncx:text");
+                if (e != null) {
+                    result = e.toText();
+                }
+            }
+            return result;
         }
 
-        public int getPlayOrder() throws XmlException {
-            String str = evalStr("@playOrder");
+        public int getPlayOrder() {
+            String str = getAttribute("playOrder");
             int result = -1;
             try {
                 str = str.trim();
@@ -72,13 +80,13 @@ public class EPubToc extends EPubXml implements IBookToc {
             return result;
         }
 
-        public EPubTocItem setContentHref(String href) throws XmlException {
-            XmlWrapper content = getOrCreateElement("ncx:content");
+        public EPubTocItem setContentHref(String href) {
+            XmlElement content = getOrCreateElement("ncx:content");
             content.setAttribute("src", href);
             return cast();
         }
 
-        public EPubTocItem setContentHref(Uri href) throws XmlException {
+        public EPubTocItem setContentHref(Uri href) {
             return setContentHref(href != null ? href.toString() : "");
         }
 
@@ -87,23 +95,17 @@ public class EPubToc extends EPubXml implements IBookToc {
             return cast();
         }
 
-        public EPubTocItem setLabel(String label) throws XmlException {
-            XmlWrapper navLabel = getOrCreateElement("ncx:navLabel");
-            XmlWrapper text = navLabel.getOrCreateElement("ncx:text");
-            text.removeChildren();
-            text.appendText(label);
+        public EPubTocItem setLabel(String label) {
+            XmlElement navLabel = getOrCreateElement("ncx:navLabel");
+            XmlElement text = navLabel.getOrCreateElement("ncx:text");
+            text.setText(label);
             return cast();
         }
 
     }
 
-    public static EPubToc newToc() throws XmlException {
-        XmlContext xmlContext = newXmlContext();
-        return newToc(xmlContext);
-    }
-
-    public static EPubToc newToc(XmlContext xmlContext) throws XmlException {
-        EPubToc toc = xmlContext.newXML("ncx:ncx", EPubToc.class);
+    public static EPubToc newToc() {
+        EPubToc toc = new EPubToc();
         toc.setBookId("");
         toc.setEPubCreator("");
         toc.setDepth(2);
@@ -113,45 +115,58 @@ public class EPubToc extends EPubXml implements IBookToc {
         return toc;
     }
 
-    public EPubToc(Node node, XmlContext context) {
-        super(node, context);
+    public EPubToc() {
+        super("ncx:ncx");
+    }
+
+    public EPubToc(IHasValueMap object) {
+        super(object);
+    }
+
+    public EPubToc(XmlElement parent, Map<Object, Object> map) {
+        super(parent, map);
     }
 
     public EPubTocItem addTocItem() {
-        try {
-            XmlWrapper navMapTag = getOrCreateElement("ncx:navMap");
-            EPubTocItem item = navMapTag.appendElement(
-                "ncx:navPoint",
-                EPubTocItem.class);
-            return item;
-        } catch (Throwable t) {
-            throw onError("Can not add a new TOC item", t);
-        }
+        XmlElement navMapTag = getOrCreateElement("ncx:navMap");
+        EPubTocItem item = new EPubTocItem();
+        navMapTag.addChild(item);
+        return item;
     }
 
-    public BookId getBookId() throws XmlException {
+    public BookId getBookId() {
         String str = getMetaField("dtb:uid");
         return new BookId(str);
     }
 
-    public int getDepth() throws XmlException {
+    public int getDepth() {
         return getMetaFieldAsInteger("dtb:depth");
     }
 
-    public String getEPubCreator() throws XmlException {
+    public String getEPubCreator() {
         return getMetaField("epub-creator");
     }
 
-    public int getMaxPageNumber() throws XmlException {
+    public int getMaxPageNumber() {
         return getMetaFieldAsInteger("dtb:maxPageNumber");
     }
 
-    private String getMetaField(String key) throws XmlException {
-        String str = evalStr("ncx:head/ncx:meta[@name='" + key + "']");
-        return str;
+    private String getMetaField(String key) {
+        String result = null;
+        XmlElement head = getChildByName("ncx:head");
+        if (head != null) {
+            XmlElement meta = head.getChildByName("ncx:meta");
+            if (meta != null) {
+                String metaName = meta.getAttribute("name");
+                if (key.equals(metaName)) {
+                    result = meta.toText();
+                }
+            }
+        }
+        return result;
     }
 
-    private int getMetaFieldAsInteger(String key) throws XmlException {
+    private int getMetaFieldAsInteger(String key) {
         String str = getMetaField(key);
         int result = 0;
         if (str != null) {
@@ -163,62 +178,68 @@ public class EPubToc extends EPubXml implements IBookToc {
         return result;
     }
 
-    public String getTocAuthor() throws XmlException {
-        return evalStr("/ncx:ncx/ncx:docAuthor/ncx:text");
+    public String getTocAuthor() {
+        XmlElement e = getChildByPath("ncx:ncx", "ncx:docAuthor", "ncx:text");
+        return e != null ? e.toText() : null;
     }
 
+    @Override
     public List<IBookTocItem> getTocItems() {
-        List<EPubTocItem> list = getXmlList(
-            "/ncx:ncx/ncx:navMap/ncx:navPoint",
-            EPubToc.EPubTocItem.class);
-        return new ArrayList<IBookTocItem>(list);
+        List<IBookTocItem> result = new ArrayList<IBookTocItem>();
+        List<XmlElement> navPoints = getChildrenByPath(
+            "ncx:ncx",
+            "ncx:navMap",
+            "ncx:navPoint");
+        for (XmlElement navPoint : navPoints) {
+            result.add(new EPubTocItem(navPoint));
+        }
+        return result;
     }
 
-    public int getTotalPageCount() throws XmlException {
+    public int getTotalPageCount() {
         return getMetaFieldAsInteger("dtb:totalPageCount");
     }
 
-    public EPubToc setBookId(String value) throws XmlException {
+    public EPubToc setBookId(String value) {
         return setMetaField("dtb:uid", value);
     }
 
-    public EPubToc setDepth(int value) throws XmlException {
+    public EPubToc setDepth(int value) {
         return setMetaField("dtb:depth", value + "");
     }
 
-    public EPubToc setEPubCreator(String value) throws XmlException {
+    public EPubToc setEPubCreator(String value) {
         return setMetaField("epub-creator", value);
     }
 
-    public EPubToc setMaxPageNumber(int value) throws XmlException {
+    public EPubToc setMaxPageNumber(int value) {
         return setMetaField("dtb:maxPageNumber", value + "");
     }
 
-    private EPubToc setMetaField(String key, String value) throws XmlException {
-        XmlWrapper headTag = getOrCreateElement("ncx:head");
-        XmlWrapper meta = headTag.eval("ncx:meta[@name='" + key + "']");
-        if (meta == null) {
-            meta = headTag.appendElement("ncx:meta");
-            meta.setAttribute("name", key);
-        }
+    private EPubToc setMetaField(String key, String value) {
+        XmlElement headTag = getOrCreateElement("ncx:head");
+        XmlElement meta = headTag.getOrCreateElement("ncx:meta");
+        meta.setAttribute("name", key);
         meta.setAttribute("content", value);
         return cast();
     }
 
-    public EPubToc setTocAuthor(String author) throws XmlException {
-        XmlWrapper authorTag = getOrCreateElement("ncx:docAuthor");
-        XmlWrapper text = authorTag.getOrCreateElement("ncx:text");
-        text.removeChildren();
-        text.appendText(author);
+    public EPubToc setTocAuthor(String author) {
+        XmlElement authorTag = getOrCreateElement("ncx:docAuthor");
+        XmlElement text = authorTag.getOrCreateElement("ncx:text");
+        text.setText(author);
         return cast();
     }
 
-    public EPubToc setTotalPageCount(int value) throws XmlException {
+    public EPubToc setTotalPageCount(int value) {
         return setMetaField("dtb:totalPageCount", value + "");
     }
 
     public void updatePaths(Uri tocPath) {
-        resolvePaths(tocPath, "//ncx:navPoint/ncx:content", "src");
+        List<XmlElement> list = getChildrenByPath("ncx:navPoint", "ncx:content");
+        for (XmlElement e : list) {
+            ReferenceUtils.resolveLink(tocPath, e, "src");
+        }
     }
 
 }

@@ -3,14 +3,14 @@ package org.ubimix.ebook.bom.epub;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
-import org.w3c.dom.Node;
 import org.ubimix.commons.uri.Uri;
-import org.ubimix.commons.xml.XmlException;
-import org.ubimix.commons.xml.XmlWrapper;
 import org.ubimix.ebook.BookId;
 import org.ubimix.ebook.bom.IBook;
 import org.ubimix.ebook.bom.IBookManifest;
+import org.ubimix.model.IHasValueMap;
+import org.ubimix.model.xml.XmlElement;
 
 /**
  * @author kotelnikov
@@ -23,22 +23,35 @@ public class EPubBook extends EPubXml implements IBook {
             implements
             IBookManifestItem {
 
-            public EPubManifestItem(Node node, XmlContext context) {
-                super(node, context);
+            public EPubManifestItem() {
+                super("opf:item");
             }
 
+            public EPubManifestItem(XmlElement e) {
+                super(e);
+            }
+
+            protected EPubManifestItem(
+                XmlElement parent,
+                Map<Object, Object> map) {
+                super(parent, map);
+            }
+
+            @Override
             public Uri getHref() {
-                String str = getString("@href");
+                String str = getAttribute("href");
                 return str != null ? new Uri(str) : null;
             }
 
+            @Override
             public BookId getID() {
-                String str = getString("@id");
+                String str = getAttribute("id");
                 return str != null ? new BookId(str) : null;
             }
 
+            @Override
             public String getMediaType() {
-                return getString("@media-type");
+                return getAttribute("media-type");
             }
 
             public EPubManifestItem setHref(Uri href) {
@@ -57,55 +70,82 @@ public class EPubBook extends EPubXml implements IBook {
             }
         }
 
-        public static EPubManifest newManifest(XmlContext xmlContext) {
-            try {
-                EPubManifest manifest = xmlContext.newXML(
-                    "opf:manifest",
-                    EPubManifest.class);
-                return manifest;
-            } catch (Throwable t) {
-                throw onError("Can not create a new manifest object", t);
-            }
+        public EPubManifest() {
+            super("opf:manifest");
         }
 
-        public EPubManifest(Node node, XmlContext context) {
-            super(node, context);
+        public EPubManifest(IHasValueMap object) {
+            super(object);
+        }
+
+        public EPubManifest(XmlElement parent, Map<Object, Object> map) {
+            super(parent, map);
         }
 
         public EPubManifest.EPubManifestItem addItem(
             String href,
-            String mediaType) throws XmlException {
+            String mediaType) {
             return addItem(new Uri(href), mediaType);
         }
 
-        public EPubManifest.EPubManifestItem addItem(Uri href, String mediaType)
-            throws XmlException {
-            EPubManifestItem item = appendElement(
-                "opf:item",
-                EPubManifest.EPubManifestItem.class);
+        public EPubManifest.EPubManifestItem addItem(Uri href, String mediaType) {
+            EPubManifestItem item = new EPubManifestItem();
             return item.setHref(href).setMediaType(mediaType);
         }
 
+        @Override
         public EPubManifest.EPubManifestItem getItemByHref(Uri href) {
-            EPubManifest.EPubManifestItem result = getXml("opf:item[@href='"
-                + href
-                + "']", EPubManifest.EPubManifestItem.class);
+            EPubManifest.EPubManifestItem result = null;
+            XmlElement e = searchChildByAttribute("opf:item", "href", href + "");
+            if (e != null) {
+                result = new EPubManifest.EPubManifestItem(e);
+            } else {
+                result = new EPubManifest.EPubManifestItem().setHref(href);
+                addChild(result);
+            }
             return result;
         }
 
+        @Override
         public EPubManifest.EPubManifestItem getItemById(BookId id) {
-            EPubManifest.EPubManifestItem result = getXml("opf:item[@id='"
-                + id
-                + "']", EPubManifest.EPubManifestItem.class);
+            XmlElement e = searchChildByAttribute("opf:item", "id", id + "");
+            return e != null ? newManifestItem(e) : null;
+        }
+
+        @Override
+        public List<IBookManifestItem> getItems() {
+            List<IBookManifestItem> result = new ArrayList<IBookManifestItem>();
+            List<XmlElement> items = getChildrenByName("opf:item");
+            for (XmlElement e : items) {
+                EPubManifestItem item = newManifestItem(e);
+                if (item != null) {
+                    result.add(item);
+                }
+            }
             return result;
         }
 
-        public List<IBookManifestItem> getItems() {
-            List<EPubManifest.EPubManifestItem> list = getXmlList(
-                "opf:item",
-                EPubManifest.EPubManifestItem.class);
-            List<IBookManifestItem> result = new ArrayList<IBookManifestItem>(
-                list);
+        protected EPubManifestItem newManifestItem(XmlElement e) {
+            return new EPubManifestItem(e);
+        }
+
+        private XmlElement searchChildByAttribute(
+            String tagName,
+            String attrName,
+            String attrValue) {
+            XmlElement result = null;
+            List<XmlElement> children = getChildrenByName(tagName);
+            for (XmlElement e : children) {
+                String value = e.getAttribute(attrName);
+                if (attrValue != null && attrValue.equals(value)) {
+                    result = e;
+                } else if (attrValue == null && value == null) {
+                    result = e;
+                }
+                if (result != null) {
+                    break;
+                }
+            }
             return result;
         }
 
@@ -113,60 +153,65 @@ public class EPubBook extends EPubXml implements IBook {
 
     public static class EPubMetadata extends EPubXml implements IBookMetadata {
 
-        public static EPubMetadata newMetadata(XmlContext xmlContext) {
-            try {
-                EPubMetadata toc = xmlContext.newXML(
-                    "opf:metadata",
-                    EPubMetadata.class);
-                return toc;
-            } catch (Throwable t) {
-                throw onError("Can not create a new metadata object", t);
-            }
+        public EPubMetadata() {
+            super("opf:metadata");
         }
 
-        public EPubMetadata(Node node, XmlContext context) {
-            super(node, context);
+        public EPubMetadata(IHasValueMap object) {
+            super(object);
         }
 
+        public EPubMetadata(XmlElement parent, Map<Object, Object> map) {
+            super(parent, map);
+        }
+
+        @Override
         public String getBookCreator() {
             return getString("dc:creator");
         }
 
+        @Override
         public BookId getBookIdentifier() {
             String id = getString("dc:identifier");
             return id != null ? new BookId(id) : null;
         }
 
+        @Override
         public String getBookLanguage() {
             return getString("dc:language");
         }
 
+        @Override
         public String getBookTitle() {
             return getString("dc:title");
         }
 
-        public EPubMetadata setBookCreator(String creator) throws XmlException {
+        protected String getString(String tagName) {
+            XmlElement e = getChildByName(tagName);
+            return e != null ? e.toText() : null;
+        }
+
+        public EPubMetadata setBookCreator(String creator) {
             setTextElement("dc:creator", creator);
             return cast();
         }
 
-        public EPubMetadata setBookIdentifier(BookId id) throws XmlException {
+        public EPubMetadata setBookIdentifier(BookId id) {
             return setBookIdentifier(id != null ? id.toString() : "");
         }
 
-        public EPubMetadata setBookIdentifier(String id) throws XmlException {
-            XmlWrapper identifierTag = getOrCreateElement("dc:identifier");
-            identifierTag.removeChildren();
-            identifierTag.appendText(id);
+        public EPubMetadata setBookIdentifier(String id) {
+            XmlElement identifierTag = getOrCreateElement("dc:identifier");
+            identifierTag.setText(id);
             return cast();
         }
 
-        public EPubMetadata setBookLanguage(String lang) throws XmlException {
+        public EPubMetadata setBookLanguage(String lang) {
             setTextElement("dc:language", lang);
             return cast();
         }
 
-        public EPubMetadata setBookTitle(String title) throws XmlException {
+        public EPubMetadata setBookTitle(String title) {
             setTextElement("dc:title", title);
             return cast();
         }
@@ -175,36 +220,37 @@ public class EPubBook extends EPubXml implements IBook {
 
     public static class EPubSpine extends EPubXml implements IBookSpine {
 
-        public static EPubSpine newSpine(XmlContext xmlContext)
-            throws XmlException {
-            return xmlContext.newXML("opf:spine", EPubSpine.class);
+        public EPubSpine() {
+            super("opf:spine");
         }
 
-        public EPubSpine(Node node, XmlContext context) {
-            super(node, context);
+        public EPubSpine(IHasValueMap object) {
+            super(object);
         }
 
-        public void addSectionId(BookId sectionId) throws XmlException {
-            XmlWrapper item = appendElement("opf:itemref");
+        public EPubSpine(XmlElement parent, Map<Object, Object> map) {
+            super(parent, map);
+        }
+
+        public void addSectionId(BookId sectionId) {
+            XmlElement item = new XmlElement("opf:itemref");
+            addChild(item);
             item.setAttribute("idref", sectionId.toString());
         }
 
+        @Override
         public List<BookId> getSectionIds() {
-            try {
-                List<BookId> result = new ArrayList<BookId>();
-                List<XmlWrapper> itemrefs = evalList("opf:itemref");
-                for (XmlWrapper itemref : itemrefs) {
-                    String ref = itemref.evalStr("@idref");
-                    result.add(new BookId(ref));
-                }
-                return result;
-            } catch (Throwable t) {
-                throw onError("Can not load identifiers for book sections", t);
+            List<BookId> result = new ArrayList<BookId>();
+            List<XmlElement> itemrefs = getChildrenByName("opf:itemref");
+            for (XmlElement itemref : itemrefs) {
+                String ref = itemref.getAttribute("idref");
+                result.add(new BookId(ref));
             }
+            return result;
         }
 
         public BookId getTocId() {
-            String str = getString("@toc");
+            String str = getAttribute("toc");
             return str != null ? new BookId(str) : null;
         }
 
@@ -216,10 +262,10 @@ public class EPubBook extends EPubXml implements IBook {
             int size = ids != null ? ids.size() : 0;
             removeChildren();
             if (size > 0) {
-                List<XmlWrapper> items = addElements("opf:itemref", size);
+                List<XmlElement> items = addElements("opf:itemref", size);
                 for (int i = 0; i < size; i++) {
                     BookId id = ids.get(i);
-                    XmlWrapper item = items.get(i);
+                    XmlElement item = items.get(i);
                     item.setAttribute("idref", id.toString());
                 }
             }
@@ -242,69 +288,67 @@ public class EPubBook extends EPubXml implements IBook {
 
     }
 
-    public static EPubBook newBook() throws XmlException {
-        XmlContext xmlContext = newXmlContext();
-        return newBook(xmlContext);
+    public EPubBook() {
+        super("opf:package");
     }
 
-    public static EPubBook newBook(XmlContext xmlContext) throws XmlException {
-        EPubBook book = xmlContext.newXML("opf:package", EPubBook.class);
-        return book;
+    public EPubBook(IHasValueMap object) {
+        super(object);
     }
 
-    public EPubBook(Node node, XmlContext context) {
-        super(node, context);
+    public EPubBook(XmlElement parent, Map<Object, Object> map) {
+        super(parent, map);
     }
 
+    @Override
     public EPubBook.EPubManifest getManifest() {
         return getManifest(true);
     }
 
     public EPubBook.EPubManifest getManifest(boolean create) {
-        return getPackageNode(
-            "opf:manifest",
-            EPubBook.EPubManifest.class,
-            create);
+        XmlElement e = getPackageNode("opf:manifest", create);
+        return e != null ? new EPubManifest(e) : null;
     }
 
+    @Override
     public EPubBook.EPubMetadata getMetadata() {
         return getMetadata(false);
     }
 
     public EPubBook.EPubMetadata getMetadata(boolean create) {
-        return getPackageNode(
-            "opf:metadata",
-            EPubBook.EPubMetadata.class,
-            create);
+        XmlElement e = getPackageNode("opf:metadata", create);
+        return e != null ? new EPubMetadata(e) : null;
     }
 
-    private <T extends EPubXml> T getPackageNode(
-        String name,
-        Class<T> type,
-        boolean create) {
-        try {
-            T result;
-            if (create) {
-                result = getOrCreateElement(name, type);
-            } else {
-                result = eval("/opf:package/" + name, type);
-            }
-            return result;
-        } catch (Throwable t) {
-            throw onError("Can not get a package element", t);
+    private XmlElement getPackageNode(String name, boolean create) {
+        XmlElement pckg = getOrCreateElement("opf:package");
+        XmlElement result;
+        if (create) {
+            result = getOrCreateElement(pckg, name);
+        } else {
+            result = pckg.getChildByName(name);
         }
+        return result;
     }
 
+    @Override
     public EPubBook.EPubSpine getSpine() {
         return getSpine(false);
     }
 
     public EPubBook.EPubSpine getSpine(boolean create) {
-        return getPackageNode("opf:spine", EPubBook.EPubSpine.class, create);
+        XmlElement e = getPackageNode("opf:spine", create);
+        return e != null ? new EPubSpine(e) : null;
     }
 
     public void updatePaths(Uri basePath) {
-        resolvePaths(basePath, "/opf:package/opf:manifest/opf:item", "href");
+        List<XmlElement> list = getChildrenByPath(
+            "opf:package",
+            "opf:manifest",
+            "opf:item");
+        for (XmlElement e : list) {
+            ReferenceUtils.resolveLink(basePath, e, "href");
+        }
     }
 
 }

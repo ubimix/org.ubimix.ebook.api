@@ -6,21 +6,19 @@ package org.ubimix.ebook.bom.epub;
 import java.io.IOException;
 import java.util.List;
 
-import org.ubimix.commons.xml.XmlException;
-import org.ubimix.commons.xml.XmlWrapper.XmlContext;
 import org.ubimix.ebook.BookId;
 import org.ubimix.ebook.bom.IBook;
-import org.ubimix.ebook.bom.IBookManifest;
-import org.ubimix.ebook.bom.IBookSection;
-import org.ubimix.ebook.bom.IBookToc;
 import org.ubimix.ebook.bom.IBook.IBookMetadata;
 import org.ubimix.ebook.bom.IBook.IBookSpine;
+import org.ubimix.ebook.bom.IBookManifest;
 import org.ubimix.ebook.bom.IBookManifest.IBookManifestItem;
+import org.ubimix.ebook.bom.IBookSection;
+import org.ubimix.ebook.bom.IBookToc;
 import org.ubimix.ebook.bom.IBookToc.IBookTocItem;
 import org.ubimix.ebook.bom.epub.EPubBook.EPubManifest;
+import org.ubimix.ebook.bom.epub.EPubBook.EPubManifest.EPubManifestItem;
 import org.ubimix.ebook.bom.epub.EPubBook.EPubMetadata;
 import org.ubimix.ebook.bom.epub.EPubBook.EPubSpine;
-import org.ubimix.ebook.bom.epub.EPubBook.EPubManifest.EPubManifestItem;
 import org.ubimix.ebook.bom.epub.EPubToc.EPubTocItem;
 
 /**
@@ -28,42 +26,31 @@ import org.ubimix.ebook.bom.epub.EPubToc.EPubTocItem;
  */
 public class EPubBookUtils {
 
-    private XmlContext fXmlContext;
-
     public EPubBookUtils() {
-        this(EPubXml.newXmlContext());
     }
 
-    public EPubBookUtils(XmlContext xmlContext) {
-        fXmlContext = xmlContext;
-    }
-
-    public EPubBook copyBook(IBook value) throws XmlException {
+    public EPubBook copyBook(IBook value) {
         if (value == null) {
             return null;
         }
-        EPubBook copy = EPubBook.newBook(fXmlContext);
+        EPubBook copy = new EPubBook();
         return copyBook(value, copy);
     }
 
-    public EPubBook copyBook(IBook value, EPubBook copy) throws XmlException {
+    public EPubBook copyBook(IBook value, EPubBook copy) {
         copyMetadata(value.getMetadata(), copy.getMetadata(true));
         copyManifest(value.getManifest(), copy.getManifest(true));
         copySpine(value.getSpine(), copy.getSpine(true));
         return copy;
     }
 
-    public EPubSection copyBookSection(IBookSection value)
-        throws XmlException,
-        IOException {
-        EPubSection copy = EPubSection.newSection(fXmlContext).setTitle(
-            value.getTitle());
+    public EPubSection copyBookSection(IBookSection value) throws IOException {
+        EPubSection copy = new EPubSection().setTitle(value.getTitle());
         return copyBookSection(value, copy);
     }
 
     public EPubSection copyBookSection(IBookSection value, EPubSection copy)
-        throws XmlException,
-        IOException {
+        throws IOException {
         if (value == null) {
             return null;
         }
@@ -75,7 +62,7 @@ public class EPubBookUtils {
         return copy;
     }
 
-    public EPubToc copyBookToc(IBookToc value) throws XmlException {
+    public EPubToc copyBookToc(IBookToc value) {
         if (value == null) {
             return null;
         }
@@ -83,8 +70,7 @@ public class EPubBookUtils {
         return copyBookToc(value, copy);
     }
 
-    public EPubToc copyBookToc(IBookToc value, EPubToc copy)
-        throws XmlException {
+    public EPubToc copyBookToc(IBookToc value, EPubToc copy) {
         List<IBookTocItem> items = value.getTocItems();
         for (IBookTocItem item : items) {
             EPubTocItem copyItem = copy.addTocItem();
@@ -93,18 +79,17 @@ public class EPubBookUtils {
         return copy;
     }
 
-    public IBookTocItem copyBookTocItem(IBookTocItem value) throws XmlException {
+    public IBookTocItem copyBookTocItem(IBookTocItem value) {
         if (value == null) {
             return null;
         }
-        EPubTocItem copy = EPubTocItem.newTocItem(fXmlContext);
+        EPubTocItem copy = new EPubTocItem();
         return copyBookTocItem(value, copy);
     }
 
-    public IBookTocItem copyBookTocItem(IBookTocItem value, EPubTocItem copy)
-        throws XmlException {
+    public IBookTocItem copyBookTocItem(IBookTocItem value, EPubTocItem copy) {
         copy.setLabel(value.getLabel()).setContentHref(value.getContentHref());
-        for (IBookTocItem item : value.getChildren()) {
+        for (IBookTocItem item : value.getTocItems()) {
             EPubTocItem itemCopy = copy.addChild();
             copyBookTocItem(item, itemCopy);
         }
@@ -115,17 +100,13 @@ public class EPubBookUtils {
         if (value == null) {
             return null;
         }
-        EPubManifest copy = EPubManifest.newManifest(fXmlContext);
+        EPubManifest copy = new EPubManifest();
         return copyManifest(value, copy);
     }
 
     public EPubManifest copyManifest(IBookManifest value, EPubManifest copy) {
         for (IBookManifestItem item : value.getItems()) {
-            try {
-                copy.addItem(item.getHref(), item.getMediaType());
-            } catch (Throwable t) {
-                throw EPubXml.onError("Can not copy a TOC item.", t);
-            }
+            copy.addItem(item.getHref(), item.getMediaType());
         }
         return copy;
     }
@@ -140,16 +121,15 @@ public class EPubBookUtils {
         return copy;
     }
 
-    public EPubMetadata copyMetadata(IBookMetadata value) throws XmlException {
+    public EPubMetadata copyMetadata(IBookMetadata value) {
         if (value == null) {
             return null;
         }
-        EPubMetadata copy = EPubMetadata.newMetadata(fXmlContext);
+        EPubMetadata copy = new EPubMetadata();
         return copyMetadata(value, copy);
     }
 
-    public EPubMetadata copyMetadata(IBookMetadata value, EPubMetadata copy)
-        throws XmlException {
+    public EPubMetadata copyMetadata(IBookMetadata value, EPubMetadata copy) {
         copy
             .setBookIdentifier(value.getBookIdentifier())
             .setBookTitle(value.getBookTitle())
@@ -158,11 +138,11 @@ public class EPubBookUtils {
         return copy;
     }
 
-    public EPubSpine copySpine(IBookSpine value) throws XmlException {
+    public EPubSpine copySpine(IBookSpine value) {
         if (value == null) {
             return null;
         }
-        EPubSpine copy = EPubSpine.newSpine(fXmlContext);
+        EPubSpine copy = new EPubSpine();
         copySpine(value, copy);
         return copy;
     }

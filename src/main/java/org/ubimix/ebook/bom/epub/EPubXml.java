@@ -1,23 +1,26 @@
 package org.ubimix.ebook.bom.epub;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.Map;
 
-import org.w3c.dom.Node;
-import org.ubimix.commons.uri.Uri;
-import org.ubimix.commons.xml.XmlWrapper;
+import org.ubimix.model.IHasValueMap;
+import org.ubimix.model.xml.XmlElement;
+import org.ubimix.model.xml.XmlText;
 
-public class EPubXml extends XmlWrapper {
+public class EPubXml extends XmlElement {
 
-    /**
-     * The logger instance used to report all errors produced by this class
-     */
-    private static Logger log = Logger.getLogger(EPubXml.class.getName());
+    public static Map<String, String> checkEpubNamespaces() {
+        HashMap<String, String> map = new LinkedHashMap<String, String>();
+        checkEpubNamespaces(map);
+        return map;
+    }
 
-    public static XmlContext newXmlContext() {
-        return XmlContext.builder(
+    public static void checkEpubNamespaces(Map<?, ?> map) {
+        toMap(
+            map,
             "odc",
             "urn:oasis:names:tc:opendocument:xmlns:container",
             "opf",
@@ -30,41 +33,48 @@ public class EPubXml extends XmlWrapper {
             "http://purl.org/dc/elements/1.1/",
             // Used by TOC files
             "ncx",
-            "http://www.daisy.org/z3986/2005/ncx/").build();
+            "http://www.daisy.org/z3986/2005/ncx/");
     }
 
-    protected static RuntimeException onError(String msg, Throwable t) {
-        if (t instanceof EPubException) {
-            return (EPubException) t;
+    public static void checkEpubNamespaces(XmlElement e) {
+        checkEpubNamespaces(e.getMap());
+    }
+
+    public static void toMap(Map<?, ?> map, String... values) {
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> m = (Map<Object, Object>) map;
+        for (int i = 0; i < values.length;) {
+            String key = values[i++];
+            String value = i < values.length ? values[i++] : null;
+            m.put(key, value);
         }
-        log.log(Level.FINE, msg, t);
-        throw new EPubException(msg, t);
     }
 
-    public EPubXml(Node node, XmlContext context) {
-        super(node, context);
+    public static Map<String, String> toMap(String... values) {
+        Map<String, String> map = new LinkedHashMap<String, String>();
+        toMap(map, values);
+        return map;
     }
 
-    protected List<XmlWrapper> addElements(String name, int count) {
-        return addElements(name, count, XmlWrapper.class);
+    public EPubXml(IHasValueMap object) {
+        super(object);
     }
 
-    protected <T extends XmlWrapper> List<T> addElements(
-        String name,
-        int count,
-        Class<T> type) {
-        try {
-            List<T> result = new ArrayList<T>();
-            for (int i = 0; i < count; i++) {
-                T wrapper = appendElement(name, type);
-                result.add(wrapper);
-            }
-            return result;
-        } catch (Throwable t) {
-            throw onError(
-                "Can not create new elements. Name: '" + name + "'.",
-                t);
+    public EPubXml(String name) {
+        super(name);
+    }
+
+    public EPubXml(XmlElement parent, Map<Object, Object> map) {
+        super(parent, map);
+    }
+
+    protected List<XmlElement> addElements(String name, int count) {
+        List<XmlElement> result = new ArrayList<XmlElement>();
+        for (int i = 0; i < count; i++) {
+            XmlElement wrapper = new XmlElement(name);
+            result.add(wrapper);
         }
+        return result;
     }
 
     @SuppressWarnings("unchecked")
@@ -72,76 +82,12 @@ public class EPubXml extends XmlWrapper {
         return (T) this;
     }
 
-    protected String getString(String path) {
-        try {
-            return evalStr(path);
-        } catch (Throwable t) {
-            throw onError("Can not load metadata", t);
+    protected XmlElement setTextElement(String name, String text) {
+        XmlElement node = getOrCreateElement(name);
+        if (text != null) {
+            node.setChildren(new XmlText(text));
         }
-    }
-
-    protected <T extends EPubXml> T getXml(String path, Class<T> type) {
-        try {
-            return eval(path, type);
-        } catch (Throwable t) {
-            throw onError("Can not load metadata", t);
-        }
-    }
-
-    protected <T extends EPubXml> T getXmlCopy(String path, Class<T> type) {
-        try {
-            T r = eval(path, type);
-            return r != null ? r.createCopy(type) : null;
-        } catch (Throwable t) {
-            throw onError("Can not load metadata", t);
-        }
-    }
-
-    protected <T extends EPubXml> List<T> getXmlList(String path, Class<T> type) {
-        try {
-            return evalList(path, type);
-        } catch (Throwable t) {
-            throw onError("Can not load metadata", t);
-        }
-    }
-
-    protected void resolvePaths(Uri basePath, String expr, String attr) {
-        try {
-            List<XmlWrapper> references = evalList(expr);
-            for (XmlWrapper ref : references) {
-                String attrValue = ref.getAttribute(attr);
-                if (attrValue != null) {
-                    Uri path = new Uri(attrValue);
-                    path = basePath.getResolved(path);
-                    ref.setAttribute(attr, path.toString());
-                }
-            }
-        } catch (Throwable t) {
-            throw EPubXml.onError("Can not resolve relative references", t);
-        }
-    }
-
-    protected XmlWrapper setTextElement(String name, String text) {
-        return setTextElement(name, text, XmlWrapper.class);
-    }
-
-    protected <T extends XmlWrapper> T setTextElement(
-        String name,
-        String text,
-        Class<T> type) {
-        try {
-            T wrapper = getOrCreateElement(name, type);
-            if (text != null) {
-                wrapper.appendText(text);
-            }
-            return wrapper;
-        } catch (Throwable t) {
-            throw onError("Can not set text in the element. Element name: '"
-                + name
-                + "'. Text: '"
-                + text
-                + "'.", t);
-        }
+        return node;
     }
 
 }

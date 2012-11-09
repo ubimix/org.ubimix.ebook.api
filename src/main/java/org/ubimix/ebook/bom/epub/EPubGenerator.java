@@ -15,9 +15,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import org.ubimix.commons.uri.Uri;
-import org.ubimix.commons.xml.XmlException;
-import org.ubimix.commons.xml.XmlWrapper;
-import org.ubimix.commons.xml.XmlWrapper.XmlContext;
 import org.ubimix.ebook.BookId;
 import org.ubimix.ebook.bem.IBookManifestListener;
 import org.ubimix.ebook.bem.IBookMetadataListener;
@@ -28,6 +25,7 @@ import org.ubimix.ebook.bom.epub.EPubBook.EPubMetadata;
 import org.ubimix.ebook.bom.epub.EPubBook.EPubSpine;
 import org.ubimix.ebook.bom.epub.EPubToc.EPubTocItem;
 import org.ubimix.ebook.io.IOutput;
+import org.ubimix.model.xml.XmlElement;
 
 /**
  * @author kotelnikov
@@ -53,16 +51,14 @@ public class EPubGenerator implements IBookListener {
 
     private File fOutputFile;
 
-    private XmlContext fXmlContext;
-
     public EPubGenerator(File outputFile) {
         fOutputFile = outputFile;
     }
 
+    @Override
     public void begin() {
         try {
-            fXmlContext = EPubXml.newXmlContext();
-            fBook = EPubBook.newBook();
+            fBook = new EPubBook();
             fOutputFile.getParentFile().mkdirs();
             FileOutputStream output = new FileOutputStream(fOutputFile);
             fOutput = new ZipOutputStream(output);
@@ -80,8 +76,7 @@ public class EPubGenerator implements IBookListener {
             fOutput.write(bytes);
             fOutput.closeEntry();
 
-            EPubContainer container = EPubContainer
-                .newEPubContainer(fXmlContext);
+            EPubContainer container = new EPubContainer();
             container.setContentDeclarationPath(EPUB_BOOK_FILE);
             writeEntry(EPubContainer.META_INF_CONTAINER_PATH, container);
 
@@ -90,6 +85,7 @@ public class EPubGenerator implements IBookListener {
         }
     }
 
+    @Override
     public void end() {
         try {
             if (fOutput != null) {
@@ -103,12 +99,14 @@ public class EPubGenerator implements IBookListener {
         }
     }
 
+    @Override
     public IBookManifestListener getManifestListener() {
         final EPubManifest manifest = fBook.getManifest(true);
         return new IBookManifestListener() {
 
             private List<BookId> fList = new ArrayList<BookId>();
 
+            @Override
             public void beginBookManifest() {
                 try {
                     Uri path = getRelativePath(EPUB_BOOK_FILE, EPUB_TOC_FILE);
@@ -119,6 +117,7 @@ public class EPubGenerator implements IBookListener {
                 }
             }
 
+            @Override
             public void endBookManifest() {
                 EPubSpine spine = fBook.getSpine(true);
                 spine.setTocId(EPUB_TOC_ID);
@@ -135,6 +134,7 @@ public class EPubGenerator implements IBookListener {
                 }
             }
 
+            @Override
             public IOutput onBookEntry(
                 Uri itemPath,
                 BookId itemId,
@@ -146,10 +146,12 @@ public class EPubGenerator implements IBookListener {
                     entry.setMethod(ZipEntry.DEFLATED);
                     fOutput.putNextEntry(entry);
                     return new IOutput() {
+                        @Override
                         public void close() throws IOException {
                             fOutput.closeEntry();
                         }
 
+                        @Override
                         public void write(byte[] buf, int offset, int len)
                             throws IOException {
                             fOutput.write(buf, offset, len);
@@ -160,6 +162,7 @@ public class EPubGenerator implements IBookListener {
                 }
             }
 
+            @Override
             public IOutput onBookSection(
                 Uri itemPath,
                 BookId itemId,
@@ -175,10 +178,12 @@ public class EPubGenerator implements IBookListener {
         };
     }
 
+    @Override
     public IBookMetadataListener getMetadataListener() {
         final EPubMetadata metadata = fBook.getMetadata(true);
         return new IBookMetadataListener() {
 
+            @Override
             public void beginBookMetadata(
                 BookId bookId,
                 String bookTitle,
@@ -194,9 +199,11 @@ public class EPubGenerator implements IBookListener {
                 }
             }
 
+            @Override
             public void endBookMetadata() {
             }
 
+            @Override
             public void onBookMetadata(String name, String value) {
             }
         };
@@ -207,36 +214,36 @@ public class EPubGenerator implements IBookListener {
         return result;
     }
 
+    @Override
     public IBookTocListener getTocListener() {
         try {
-            final EPubToc toc = EPubToc.newToc(fXmlContext);
+            final EPubToc toc = new EPubToc();
             return new IBookTocListener() {
 
                 private Stack<EPubTocItem> fStack = new Stack<EPubToc.EPubTocItem>();
 
+                @Override
                 public void beginToc() {
                 }
 
+                @Override
                 public void beginTocItem(Uri path, String label) {
-                    try {
-                        EPubTocItem peek = getPeek();
-                        EPubTocItem item;
-                        if (peek == null) {
-                            item = toc.addTocItem();
-                        } else {
-                            item = peek.addChild();
-                        }
-                        if (path != null) {
-                            path = getRelativePath(EPUB_TOC_FILE, path);
-                            item.setContentHref(path);
-                        }
-                        item.setLabel(label);
-                        fStack.push(item);
-                    } catch (XmlException t) {
-                        throw onError("Can not create a new TOC item.", t);
+                    EPubTocItem peek = getPeek();
+                    EPubTocItem item;
+                    if (peek == null) {
+                        item = toc.addTocItem();
+                    } else {
+                        item = peek.addChild();
                     }
+                    if (path != null) {
+                        path = getRelativePath(EPUB_TOC_FILE, path);
+                        item.setContentHref(path);
+                    }
+                    item.setLabel(label);
+                    fStack.push(item);
                 }
 
+                @Override
                 public void endToc() {
                     try {
                         writeEntry(EPUB_TOC_FILE, toc);
@@ -245,6 +252,7 @@ public class EPubGenerator implements IBookListener {
                     }
                 }
 
+                @Override
                 public void endTocItem() {
                     fStack.pop();
                 }
@@ -282,7 +290,7 @@ public class EPubGenerator implements IBookListener {
         }
     }
 
-    private void writeEntry(Uri fileName, XmlWrapper xml) throws IOException {
+    private void writeEntry(Uri fileName, XmlElement xml) throws IOException {
         StringBuilder buf = new StringBuilder();
         buf.append("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
         buf.append(xml.toString());

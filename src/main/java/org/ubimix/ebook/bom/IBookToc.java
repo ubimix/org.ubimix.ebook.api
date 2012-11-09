@@ -24,7 +24,7 @@ public interface IBookToc {
         /**
          * @return a list of child items
          */
-        List<IBookTocItem> getChildren();
+        List<IBookTocItem> getTocItems();
 
         /**
          * @return path from the root of the e-book package to the referenced
